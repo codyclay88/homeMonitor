@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/site.css" />
+    <title>Home Monitor</title>
+</head>
+<body>
+    <div class="container" style="height: 100vh" data-bind="visible: !authenticated()">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-md-offset-3">
+                <h1>
+                    Welcome to HomeMonitor!
+                </h1>
+                <div class="form-group">
+                    <label for="exampleInputEmail1">Email address</label>
+                    <input type="email" class="form-control" data-bind="value: email" placeholder="Enter email">
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputPassword1">Password</label>
+                    <input type="password" class="form-control" data-bind="value: password" placeholder="Password">
+                </div>
+                <button type="submit" class="btn btn-primary" data-bind="click: login">Sign In</button>
+            </div>
+        </div>
+    </div>
+    <div class="container" data-bind="visible: authenticated()">
+        <div class="row">
+            <div class="col-sm">
+                <h4 style="display: inline-block; padding-top: 10px;">Your Devices (<span data-bind="text: devices().length"></span>)</h4>
+            </div>
+            <div class="col-sm-auto">
+                <a href="#" class="btn btn-primary btn-md" data-bind="click: getDevices"> Refresh Devices </a>
+            </div>
+        </div>
+        
+        <table class="table table-bordered table-condensed table-hover">
+            <thead>
+                <tr>
+                    <th>Device Name</th>
+                    <th>Connected</th>
+                    <th>Status</th>
+                    <th>Last Heard</th>
+                </tr>
+            </thead>
+            <tbody data-bind="foreach: devices">
+                <tr data-bind="click: $root.selectDevice">
+                    <td data-bind="text: name"></td>
+                    <td data-bind="text: connected"></td>
+                    <td data-bind="text: status"></td>
+                    <td data-bind="text: last_heard"></td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="row">
+            <div class="col">
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.2/knockout-min.js"></script>
+    <script type="text/javascript" src="//cdn.jsdelivr.net/particle-api-js/5/particle.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            var particle = new Particle();
+            
+            function AppViewModel() {
+                var self = this;
+                self.email = "";
+                self.password = "";
+                self.token = localStorage.getItem("particleToken");
+                self.devices = ko.observableArray();
+                self.selectedDevice = ko.observable();
+                self.eventStream = ko.observableArray();
+
+                self.authenticated = ko.computed(function() {
+                    return self.token != "" && self.token != null;
+                });
+
+                self.login = function() {
+                    particle.login({username: self.email, password: self.password}).then(
+                        function(data){
+                            console.log('API call completed on promise resolve: ', data.body.access_token);
+                            self.token = data.body.access_token;
+                            localStorage.setItem("particleToken", self.token);
+                            self.getDevices();
+                        },
+                        function(err) {
+                            console.log('API call completed on promise fail: ', err);
+                        });
+                }
+
+                self.selectDevice = function(device) {
+                    particle.getEventStream({ deviceId: device.id, auth: self.token}).then(
+                        function(res) {
+                            console.log(res);
+                        },
+                        function(err) {
+                            console.log("An error occurred: ", err);
+                        });
+                }
+
+                self.getDevices = function() {
+                    particle.listDevices({auth: self.token}).then(
+                        function(res) {
+                            var devices = res.body;
+                            self.devices.removeAll();
+                            self.devices.push(...devices);
+                            self.selectDevice(self.devices()[0]);
+                            console.log(self.devices());
+                        },
+                        function(err) {
+                            console.log("An error occurred: ", err);
+                        });
+                }
+                
+                self.getDevices();
+            }
+            ko.applyBindings(new AppViewModel());
+        });    
+    </script>
+</body>
+</html>
